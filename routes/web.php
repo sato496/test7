@@ -55,10 +55,6 @@ Route::delete('/products/{product}', [ProductController::class, 'destroy'])->nam
 // ルートが作成されます。
 //　つまりログイン画面に用意されたビューのリンク先がこの1行で済みます
 
-Route::group(['middleware' => 'auth'], function () {
-    Route::resource('products', ProductController::class);
-});
-
 
 
 Auth::routes();
