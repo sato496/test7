@@ -16,20 +16,49 @@ use App\Http\Requests\ArticleRequest;
 class ProductController extends Controller 
 {
     
-    public function index(Request $request)
-    {
+   public function index(Request $request)
+{
     $companies = Company::all();
 
     $query = Product::with('company');
 
+    // メーカー絞り込み
     if ($request->filled('company_id')) {
         $query->where('company_id', $request->company_id);
     }
 
+    // 価格の範囲指定
+    if ($request->filled('price_min')) {
+        $query->where('price', '>=', $request->price_min);
+    }
+    if ($request->filled('price_max')) {
+        $query->where('price', '<=', $request->price_max);
+    }
+
+    // 在庫数の範囲指定
+    if ($request->filled('stock_min')) {
+        $query->where('stock', '>=', $request->stock_min);
+    }
+    if ($request->filled('stock_max')) {
+        $query->where('stock', '<=', $request->stock_max);
+    }
+
+    $sortBy = $request->input('sort_by', 'id'); // 初期はID
+    $sortOrder = $request->input('sort_order', 'desc'); // 初期は降順
+
+if ($sortBy === 'company_name') {
+    $query->join('companies', 'products.company_id', '=', 'companies.id')
+          ->select('products.*', 'companies.company_name')
+          ->orderBy('companies.company_name', $sortOrder);
+} else {
+    $query->orderBy("products.$sortBy", $sortOrder);
+}
+
+
     $products = $query->paginate(10);
 
     return view('products.index', compact('products', 'companies'));
-    }
+}
 
 
     public function create()
@@ -41,7 +70,7 @@ class ProductController extends Controller
         return view('products.create', compact('companies'));
     }
 
-   public function store(ArticleRequest $request)
+  public function store(ArticleRequest $request)
 {
     try {
         DB::beginTransaction();
@@ -61,20 +90,12 @@ class ProductController extends Controller
         }
 
         $product->save();
-
-        Log::info('登録成功: ' . $product->id); 
-
         DB::commit();
 
-        return redirect()->route('products.index')
-            ->with('success', '商品を登録しました');
+        return redirect()->route('products.index')->with('success', '商品を登録しました');
     } catch (\Exception $e) {
         DB::rollBack();
-        Log::error('登録失敗: ' . $e->getMessage());
-
-        return redirect()->back()
-            ->withErrors(['error' => '登録処理中にエラーが発生しました'])
-            ->withInput();
+        return redirect()->back()->withErrors(['error' => '登録処理中にエラーが発生しました'])->withInput();
     }
 }
 
@@ -96,7 +117,7 @@ class ProductController extends Controller
 
     public function update(ArticleRequest $request, Product $product)
 {
-    $request->validate(Product::rules(true));
+   
     try {
         DB::beginTransaction();
 
@@ -139,6 +160,10 @@ class ProductController extends Controller
         $product->delete();
 
         DB::commit();
+       
+        if (request()->ajax()) {
+     return response()->json(['success' => true]);
+       }
 
        
        return redirect()->route('products.index')
@@ -151,8 +176,58 @@ class ProductController extends Controller
             ->withErrors(['error' => '削除処理中にエラーが発生しました']);
     }
 }
-    
+     public function search(Request $request)
+{
+    $sortBy = $request->input('sort_by', 'id');
+    $sortOrder = $request->input('sort_order', 'desc');
+
+    $query = Product::query();
+
+    // JOINが必要な場合
+    if ($sortBy === 'company_name') {
+        $query->join('companies', 'products.company_id', '=', 'companies.id')
+              ->select('products.*', 'companies.company_name')
+              ->with('company');
+    } else {
+        $query->with('company');
+    }
+
+    // 検索条件
+    if ($request->filled('search')) {
+        $query->where('products.product_name', 'like', '%' . $request->search . '%');
+    }
+
+    if ($request->filled('price_min')) {
+        $query->where('products.price', '>=', $request->price_min);
+    }
+    if ($request->filled('price_max')) {
+        $query->where('products.price', '<=', $request->price_max);
+    }
+
+    if ($request->filled('stock_min')) {
+        $query->where('products.stock', '>=', $request->stock_min);
+    }
+    if ($request->filled('stock_max')) {
+        $query->where('products.stock', '<=', $request->stock_max);
+    }
+
+    if ($request->filled('company_id')) {
+        $query->where('products.company_id', $request->company_id);
+    }
+
+    // ソート
+    $query->orderBy($sortBy === 'company_name' ? 'companies.company_name' : 'products.' . $sortBy, $sortOrder);
+
+    $products = $query->get();
+
+    return response()->json([
+        'html' => view('products.partials.list', [
+            'products' => $products,
+            'sort_by' => $sortBy,
+            'sort_order' => $sortOrder
+        ])->render()
+    ]);
+}
      }
-    
 
-
+     
