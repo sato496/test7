@@ -19,7 +19,6 @@ class ProductController extends Controller
    public function index(Request $request)
 {
     $companies = Company::all();
-
     $query = Product::with('company');
 
     // メーカー絞り込み
@@ -43,8 +42,8 @@ class ProductController extends Controller
         $query->where('stock', '<=', $request->stock_max);
     }
 
-    $sortBy = $request->input('sort_by', 'id'); // 初期はID
-    $sortOrder = $request->input('sort_order', 'desc'); // 初期は降順
+    $sortBy = $request->input('sort', 'id'); // 初期はID
+    $sortOrder = $request->input('direction', 'desc'); // 初期は降順
 
 if ($sortBy === 'company_name') {
     $query->join('companies', 'products.company_id', '=', 'companies.id')
@@ -57,7 +56,15 @@ if ($sortBy === 'company_name') {
 
     $products = $query->paginate(10);
 
-    return view('products.index', compact('products', 'companies'));
+    if ($request->ajax()) {
+    $html = view('products.partials.table', compact('products'))->render();
+    return response()->json(['html' => $html]);
+}
+
+
+
+return view('products.index', compact('products', 'companies'));
+
 }
 
 
@@ -176,58 +183,4 @@ if ($sortBy === 'company_name') {
             ->withErrors(['error' => '削除処理中にエラーが発生しました']);
     }
 }
-     public function search(Request $request)
-{
-    $sortBy = $request->input('sort_by', 'id');
-    $sortOrder = $request->input('sort_order', 'desc');
-
-    $query = Product::query();
-
-    // JOINが必要な場合
-    if ($sortBy === 'company_name') {
-        $query->join('companies', 'products.company_id', '=', 'companies.id')
-              ->select('products.*', 'companies.company_name')
-              ->with('company');
-    } else {
-        $query->with('company');
-    }
-
-    // 検索条件
-    if ($request->filled('search')) {
-        $query->where('products.product_name', 'like', '%' . $request->search . '%');
-    }
-
-    if ($request->filled('price_min')) {
-        $query->where('products.price', '>=', $request->price_min);
-    }
-    if ($request->filled('price_max')) {
-        $query->where('products.price', '<=', $request->price_max);
-    }
-
-    if ($request->filled('stock_min')) {
-        $query->where('products.stock', '>=', $request->stock_min);
-    }
-    if ($request->filled('stock_max')) {
-        $query->where('products.stock', '<=', $request->stock_max);
-    }
-
-    if ($request->filled('company_id')) {
-        $query->where('products.company_id', $request->company_id);
-    }
-
-    // ソート
-    $query->orderBy($sortBy === 'company_name' ? 'companies.company_name' : 'products.' . $sortBy, $sortOrder);
-
-    $products = $query->get();
-
-    return response()->json([
-        'html' => view('products.partials.list', [
-            'products' => $products,
-            'sort_by' => $sortBy,
-            'sort_order' => $sortOrder
-        ])->render()
-    ]);
 }
-     }
-
-     

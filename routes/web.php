@@ -29,6 +29,8 @@ Auth::routes();
 // 商品一覧画面
 Route::get('/products', [ProductController::class, 'index'])->name('products.index');
 
+Route::get('/products/search', [ProductController::class, 'index'])->name('products.search');
+
 // 商品登録フォーム画面
 Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
 
@@ -55,8 +57,5 @@ Route::delete('/products/{product}', [ProductController::class, 'destroy'])->nam
 // ルートが作成されます。
 //　つまりログイン画面に用意されたビューのリンク先がこの1行で済みます
 
-
-
-Auth::routes();
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');

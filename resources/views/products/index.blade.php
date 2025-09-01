@@ -2,16 +2,6 @@
 
 @section('content')
 
-@php
-  function sortLink($label, $column) {
-      $isActive = request('sort_by') === $column;
-      $nextOrder = $isActive && request('sort_order') === 'asc' ? 'desc' : 'asc';
-      $icon = $isActive ? (request('sort_order') === 'asc' ? '▲' : '▼') : '';
-      $query = array_merge(request()->query(), ['sort_by' => $column, 'sort_order' => $nextOrder]);
-      $url = route('products.index', $query);
-      return "<a href=\"{$url}\">{$label} {$icon}</a>";
-  }
-@endphp
 
 <div class="container">
     <h1 class="mb-4">商品一覧画面</h1>
@@ -21,7 +11,8 @@
 
 <div class="search mt-5">
     
-   <form action="{{ route('products.index') }}" method="GET" class="d-flex gap-3 align-items-end flex-wrap mt-3">
+   <form id="search-form" action="{{ route('products.search') }}" method="GET" class="d-flex gap-3 align-items-end flex-wrap mt-3">
+
     
     <div>
     <input type="text" name="search" id="search" class="form-control" placeholder="検索ワード" value="{{ request('search') }}">
@@ -70,124 +61,68 @@
 
 
 
-    <div class="products container mt-5">
-
+    <div id="products-area">
+         @include('products.partials.table')
         
-        <table class="table table-striped">
-   <thead>
-  <tr>
-    <th>{!! sortLink('ID', 'id') !!}</th>
-    <th>商品画像</th>
-    <th>{!! sortLink('商品名', 'product_name') !!}</th>
-    <th>{!! sortLink('価格', 'price') !!}</th>
-    <th>{!! sortLink('在庫数', 'stock') !!}</th>
-    <th>{!! sortLink('メーカー名', 'company_name') !!}</th>
-    <th>
-      <a href="{{ route('products.create') }}" class="btn btn-success btn-sm">新規登録</a>
-    </th>
-  </tr>
-</thead>
-
-
-
-<tbody>
-@foreach ($products as $product)
-    <tr>
-  <td>{{ $product->id }}</td>
-  <td><img src="{{ asset($product->img_path) }}" alt="商品画像" width="100"></td>
-  <td>{{ $product->product_name }}</td>
-  <td>{{ $product->price }}</td>
-  <td class="stock-cell">{{ $product->stock }}</td>
-  <td>{{ $product->company->company_name ?? '' }}</td>
-  <td>
-    <a href="{{ route('products.show', $product) }}" class="btn btn-info btn-sm mx-1">詳細</a>
-
-    <form method="POST"
-          action="{{ route('products.destroy', $product) }}"
-          class="d-inline delete-form"
-          data-id="{{ $product->id }}">
-      @csrf
-      @method('DELETE')
-      <button type="submit" class="btn btn-danger btn-sm mx-1">削除</button>
-    </form>
-
-  </td>
-</tr>
-
-@endforeach
-</tbody>
-
-        </table>
     </div>
 
-{{ $products->appends(request()->query())->links() }}
-    
 </div>
+
+@endsection
+
+@section('scripts')
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('.delete-form').forEach(form => {
-    form.addEventListener('submit', function (e) {
-      e.preventDefault(); // 通常送信を止める
 
-      if (!confirm('本当に削除しますか？')) return;
+$(function() {
+  // 削除処理
+  $(document).on('submit', '.delete-form', function(e) {
+    e.preventDefault();
+    if (!confirm('本当に削除しますか？')) return;
 
-      const productId = this.dataset.id;
+    const productId = $(this).data('id');
 
-      fetch(`/products/${productId}`, {
-        method: 'DELETE',
-        headers: {
-          'X-CSRF-TOKEN': '{{ csrf_token() }}',
-          'X-Requested-With': 'XMLHttpRequest'
-        }
-      })
-      .then(res => {
-        if (!res.ok) throw new Error('削除失敗');
-        this.closest('tr').remove();
-      })
-      .catch(err => {
-        alert('削除に失敗しました');
-        console.error(err);
-      });
-    });
-  });
-});
-document.querySelectorAll('.purchase-button').forEach(button => {
-  button.addEventListener('click', function () {
-    const productId = this.dataset.id;
-
-    fetch('/api/purchase', {
-      method: 'POST',
+    fetch(`/products/${productId}`, {
+      method: 'DELETE',
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        product_id: productId,
-        quantity: 1
-      })
+        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
     })
-    .then(res => res.json())
-    .then(data => {
-      alert(data.message || '購入完了');
-
-      // 在庫表示の更新
-      const row = this.closest('tr');
-      const stockCell = row.querySelector('.stock-cell');
-      const currentStock = parseInt(stockCell.textContent);
-      stockCell.textContent = currentStock - 1;
+    .then(res => {
+      if (!res.ok) throw new Error('削除失敗');
+      $(this).closest('tr').remove();
     })
     .catch(err => {
-      alert('購入に失敗しました');
+      alert('削除に失敗しました');
       console.error(err);
     });
   });
+
+  // 検索処理
+  $(document).on('submit', '#search-form', function(e) {
+    e.preventDefault();
+
+    $.ajax({
+      url: $(this).attr('action'),
+      method: 'GET',
+      data: $(this).serialize(),
+      success: function(data) {
+        console.log(data);
+        $('#products-area').html(data.html); 
+      },
+      error: function (xhr, status, err) {
+        console.log('通信エラーです');
+        console.log(err);
+      }
+    });
+  });
+
 });
 
-
-
-
 </script>
-
-
 @endsection
+
+
+
+
 
